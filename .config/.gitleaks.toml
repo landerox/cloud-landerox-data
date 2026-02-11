@@ -1,0 +1,5 @@
+[allowlist]
+paths = [
+    '''\.config/\.secrets\.baseline''',
+    '''uv\.lock'''
+]

@@ -1,0 +1,25 @@
+# Exclude version control
+.git/
+.gitignore
+.gitkeep
+
+# Exclude deployment config files
+Justfile
+README.md
+setup.sh
+
+# Exclude Python cache and envs
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# Exclude IDE and System files
+.vscode/
+.idea/
+.DS_Store
+
+# Project Specific
+!**/config.json
+**/config.template.json

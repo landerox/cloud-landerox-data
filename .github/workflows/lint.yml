@@ -1,0 +1,47 @@
+name: Lint and Format
+
+on:
+  # Run on pushes to main to ensure the source of truth is always validated
+  push:
+    branches: [main]
+  # Run on PRs to ensure code is clean before merging
+  pull_request:
+    branches: [main]
+  # Allow manual execution from the GitHub Actions tab
+  workflow_dispatch:
+  # Run when called by CD workflows (Quality Gate)
+  workflow_call:
+
+jobs:
+  quality-check:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: uv sync --frozen
+
+      - name: Run Pre-commit (All Hooks)
+        run: |
+          uv run pre-commit run --all-files
+
+      - name: Audit Dependencies (Security)
+        run: uv run pip-audit
+
+      - name: Run Unit Tests
+        run: uv run pytest

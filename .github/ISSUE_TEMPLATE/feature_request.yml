@@ -1,0 +1,44 @@
+feature:
+  name: Feature Request
+  about: Suggest an idea for this project
+  labels: ["enhancement"]
+  body:
+    - type: markdown
+      attributes:
+        value: |
+          Thanks for suggesting a feature! Please tell us about your idea.
+    - type: input
+      id: title
+      attributes:
+        label: "Feature Request Title"
+        description: "A concise, descriptive title for the feature."
+        placeholder: "e.g., Add support for streaming data from Kafka"
+      validations:
+        required: true
+    - type: textarea
+      id: description
+      attributes:
+        label: "Feature Description"
+        description: "A clear and concise description of the feature. What problem does it solve?"
+        placeholder: |
+          As a [user role], I want to [perform some action] so that [I can achieve some goal].
+    - type: textarea
+      id: motivation
+      attributes:
+        label: "Motivation"
+        description: "Why is this feature important? What are the benefits?"
+        placeholder: |
+          This feature would help us to...
+          It would improve...
+    - type: textarea
+      id: alternatives
+      attributes:
+        label: "Alternatives Considered"
+        description: "Are there any alternative solutions you've considered?"
+        placeholder: |
+          For example, we considered... but it has limitations...
+    - type: textarea
+      id: additional-context
+      attributes:
+        label: "Additional Context"
+        description: "Any other relevant information or context that might be helpful."

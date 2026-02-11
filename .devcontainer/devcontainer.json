@@ -1,0 +1,54 @@
+{
+  "name": "landerox-github-io",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "BASE_IMAGE": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true,
+        "[markdown]": {
+          "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+          "editor.wordWrap": "on"
+        },
+        "[toml]": {
+          "editor.wordWrap": "on"
+        },
+        "files.associations": {
+          "zensical.toml": "toml"
+        }
+      },
+      "extensions": [
+        "aaron-bond.better-comments",
+        "bierner.markdown-mermaid",
+        "charliermarsh.ruff",
+        "codezombiech.gitignore",
+        "DavidAnson.vscode-markdownlint",
+        "eamodio.gitlens",
+        "EditorConfig.EditorConfig",
+        "GitHub.copilot-chat",
+        "mikestead.dotenv",
+        "ms-azuretools.vscode-docker",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "ms-python.python",
+        "PKief.material-icon-theme",
+        "redhat.vscode-yaml",
+        "ReprEng.csv",
+        "streetsidesoftware.code-spell-checker",
+        "tamasfe.even-better-toml",
+        "usernamehw.errorlens",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "vscode"
+}

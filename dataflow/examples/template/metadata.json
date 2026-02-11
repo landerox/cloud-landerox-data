@@ -1,0 +1,38 @@
+{
+  "name": "Template Pipeline",
+  "description": "A reference Kappa Architecture pipeline that handles both batch and streaming.",
+  "parameters": [
+    {
+      "name": "input_mode",
+      "label": "Input Mode",
+      "helpText": "stream or batch",
+      "isOptional": true,
+      "regexes": ["(stream|batch)"]
+    },
+    {
+      "name": "input_subscription",
+      "label": "Input Subscription",
+      "helpText": "Pub/Sub subscription for streaming mode",
+      "isOptional": true
+    },
+    {
+      "name": "input_path",
+      "label": "Input GCS Path",
+      "helpText": "GCS path for batch mode",
+      "isOptional": true
+    },
+    {
+      "name": "output_table",
+      "label": "Output BigQuery Table",
+      "helpText": "Project:Dataset.Table",
+      "isOptional": false
+    },
+    {
+      "name": "write_disposition",
+      "label": "Write Disposition",
+      "helpText": "WRITE_APPEND or WRITE_TRUNCATE",
+      "isOptional": true,
+      "regexes": ["(WRITE_APPEND|WRITE_TRUNCATE)"]
+    }
+  ]
+}

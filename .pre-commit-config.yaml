@@ -1,0 +1,104 @@
+# =============================================================================
+# Pre-commit Configuration
+# =============================================================================
+#
+# This file configures pre-commit hooks for code quality and security checks.
+#
+# Setup:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Manual run:
+#   pre-commit run --all-files
+#
+# Update hooks:
+#   pre-commit autoupdate
+#
+# =============================================================================
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  # ---------------------------------------------------------------------------
+  # General Hooks (Managed by pre-commit)
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # ---------------------------------------------------------------------------
+  # Local Hooks (Uses uv-managed tools from pyproject.toml)
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        require_serial: true
+      - id: detect-secrets
+        name: detect-secrets
+        entry: uv run detect-secrets-hook --baseline .config/.secrets.baseline
+        language: system
+        types: [text]
+        exclude: uv.lock
+      - id: pip-audit
+        name: pip-audit
+        entry: uv run pip-audit
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: ty
+        name: ty (Type Checker)
+        entry: uv run ty check
+        language: system
+        types: [python]
+        pass_filenames: false
+
+  # ---------------------------------------------------------------------------
+  # CI/CD & Security Hooks
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.10
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        args: [--config, .config/.gitleaks.toml]
+
+  # ---------------------------------------------------------------------------
+  # Markdown Hooks
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0
+    hooks:
+      - id: markdownlint
+        args: [--fix, --config, .config/.markdownlint.yaml]
+
+  # ---------------------------------------------------------------------------
+  # Commit Message Hooks
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.13.7
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
