@@ -1,0 +1,12 @@
+{
+  "project_id": "my-gcp-project",
+  "region": "us-central1",
+  "function_name": "source-webhook-ingestion",
+  "bronze_bucket": "my-bronze-bucket",
+  "pubsub_topic": "projects/my-gcp-project/topics/source-events",
+  "input_subscription": "projects/my-gcp-project/subscriptions/source-events-sub",
+  "output_table": "my-gcp-project:raw_source.silver_events",
+  "write_disposition": "WRITE_APPEND",
+  "schema_version": "v1",
+  "kms_key": "projects/my-gcp-project/locations/us-central1/keyRings/data/cryptoKeys/pipelines"
+}
