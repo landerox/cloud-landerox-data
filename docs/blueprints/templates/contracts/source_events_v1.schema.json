@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/contracts/source_events_v1.schema.json",
+  "title": "Source Events v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_time",
+    "source",
+    "schema_version",
+    "payload",
+    "ingested_at"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable idempotency key for the incoming event"
+    },
+    "event_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Original event timestamp in RFC3339 UTC"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Logical source identifier (system/webhook/topic)"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^v[0-9]+$",
+      "description": "Contract version label"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Domain payload (source specific)",
+      "additionalProperties": true
+    },
+    "ingested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Ingestion timestamp in RFC3339 UTC"
+    }
+  }
+}

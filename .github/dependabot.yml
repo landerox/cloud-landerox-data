@@ -1,0 +1,124 @@
+# =============================================================================
+# Dependabot configuration
+# =============================================================================
+#
+# Policy:
+#   - Weekly cadence, Mondays 06:00 UTC, one cohort per ecosystem.
+#   - Cooldown of 7 days for any release; 14 days extra for majors so we
+#     never YOLO a fresh major upgrade.
+#   - Production deps grouped separately from dev tooling so a noisy
+#     ruff/pytest bump never delays an apache-beam patch review (and
+#     vice versa).
+#   - Conventional Commits prefixes match the project policy:
+#       build(deps): production runtime deps  -> affects the wheel
+#       chore(deps): development tooling      -> dev-only
+#       ci(deps):    GitHub Actions           -> CI/CD config
+#       chore(devcontainer|docker): dev env   -> not shipped
+#   - At most 3 open PRs per ecosystem; review them before more arrive.
+#
+# Reference: https://docs.github.com/en/code-security/dependabot/working-with-dependabot
+# =============================================================================
+version: 2
+updates:
+  # ---------------------------------------------------------------------------
+  # Python (pyproject.toml: runtime + dev tools)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "build"
+      prefix-development: "chore"
+      include: "scope"
+    groups:
+      python-prod:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      python-dev:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions (.github/workflows/*.yml)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    # github-actions only supports `default-days`; actions are not strict
+    # SemVer so per-major cooldown is not honoured.
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ---------------------------------------------------------------------------
+  # Devcontainer features (devcontainer.json)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+    labels:
+      - "dependencies"
+      - "devcontainer"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # ---------------------------------------------------------------------------
+  # Docker base image (.devcontainer/Dockerfile FROM)
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/.devcontainer"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
+      include: "scope"

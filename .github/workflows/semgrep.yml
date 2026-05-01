@@ -1,0 +1,81 @@
+# =============================================================================
+# Semgrep SAST
+# =============================================================================
+#
+# Static Application Security Testing complementary to CodeQL. Semgrep is
+# faster, has Python-specific rules CodeQL misses, and ships with curated
+# rulesets. Findings land in the GitHub Security tab as SARIF.
+#
+# Anonymous mode: no Semgrep Cloud account required. The container image
+# bundles the engine + rules, so no token is needed.
+#
+# Reference: https://semgrep.dev/docs/semgrep-ci/sample-ci-configs
+# =============================================================================
+name: Security · Semgrep
+run-name: >-
+  ${{
+    github.event_name == 'pull_request' && github.event.pull_request.title
+    || github.event_name == 'push' && github.event.head_commit.message
+    || github.event_name == 'schedule' && 'security(semgrep): weekly SAST sweep'
+    || github.event_name
+  }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/semgrep.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/semgrep.yml"
+  schedule:
+    # Mondays 08:00 UTC. Off-peak from CodeQL (06:00) and Scorecard (07:00).
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Run semgrep
+        run: |
+          semgrep scan \
+            --sarif \
+            --sarif-output=semgrep.sarif \
+            --config=p/python \
+            --config=p/security-audit \
+            --config=p/secrets \
+            --error \
+            --severity=ERROR
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a  # v3
+        with:
+          sarif_file: semgrep.sarif
+        if: always()

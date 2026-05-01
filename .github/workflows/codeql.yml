@@ -1,0 +1,78 @@
+# =============================================================================
+# CodeQL SAST
+# =============================================================================
+#
+# GitHub-native dataflow analysis with the security-and-quality query
+# suite. Findings land in the Security tab as SARIF. Runs on PR, push to
+# main, and weekly so newly published advisories surface even on quiet
+# weeks.
+# =============================================================================
+name: Security · CodeQL
+run-name: >-
+  ${{
+    github.event_name == 'pull_request' && github.event.pull_request.title
+    || github.event_name == 'push' && github.event.head_commit.message
+    || github.event_name == 'schedule' && 'security(codeql): weekly SAST sweep'
+    || github.event_name
+  }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/codeql.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/codeql.yml"
+  schedule:
+    # Weekly on Monday 06:00 UTC; decouples CodeQL from PR cadence so new
+    # advisories are picked up even on quiet weeks.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a  # v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a  # v3
+        with:
+          category: "/language:${{ matrix.language }}"

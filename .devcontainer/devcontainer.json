@@ -1,0 +1,74 @@
+{
+  "name": "cloud-landerox-data",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "BASE_IMAGE": "mcr.microsoft.com/devcontainers/python:1-3.13-bookworm@sha256:0aa711e570b306c02946cdda67587ce8c65978dbb65691341cbcfd4854dfcfff"
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "GOOGLE_CLOUD_PROJECT": "local-project",
+    "PUBSUB_EMULATOR_HOST": "localhost:8085"
+  },
+  "forwardPorts": [8085],
+  "portsAttributes": {
+    "8085": {
+      "label": "Pub/Sub emulator",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true,
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        },
+        "[markdown]": {
+          "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+          "editor.wordWrap": "on"
+        },
+        "markdownlint.configFile": ".config/markdownlint.yaml",
+        "[toml]": {
+          "editor.wordWrap": "on"
+        }
+      },
+      "extensions": [
+        "aaron-bond.better-comments",
+        "bierner.markdown-mermaid",
+        "charliermarsh.ruff",
+        "codezombiech.gitignore",
+        "DavidAnson.vscode-markdownlint",
+        "eamodio.gitlens",
+        "EditorConfig.EditorConfig",
+        "GitHub.copilot-chat",
+        "GitHub.vscode-github-actions",
+        "mikestead.dotenv",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "PKief.material-icon-theme",
+        "redhat.vscode-yaml",
+        "ReprEng.csv",
+        "streetsidesoftware.code-spell-checker",
+        "tamasfe.even-better-toml",
+        "usernamehw.errorlens",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "updateContentCommand": "uv sync --frozen",
+  "remoteUser": "vscode"
+}

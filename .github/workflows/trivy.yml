@@ -1,0 +1,115 @@
+# =============================================================================
+# Trivy
+# =============================================================================
+#
+# Two scopes, kept in one workflow for discoverability:
+# - **config-scan** runs on every PR/push that touches .devcontainer/ or
+#   workflow files. It analyzes the Dockerfile + IaC for misconfigurations
+#   and is fast enough to gate merges (blocking on CRITICAL/HIGH).
+# - **image-scan** runs weekly only. It builds the devcontainer image and
+#   scans it for OS + library CVEs. Heavy (~5-10 min), informational --
+#   findings land in the Security tab as SARIF.
+#
+# Reference: https://github.com/aquasecurity/trivy-action
+# =============================================================================
+name: Security · Trivy
+run-name: >-
+  ${{
+    github.event_name == 'pull_request' && github.event.pull_request.title
+    || github.event_name == 'push' && github.event.head_commit.message
+    || github.event_name == 'schedule' && 'security(trivy): weekly image CVE scan'
+    || github.event_name
+  }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".devcontainer/**"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".devcontainer/**"
+      - ".github/workflows/**"
+  schedule:
+    # Mondays 09:00 UTC. Off-peak: CodeQL 06:00, Scorecard 07:00, Semgrep 08:00.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  config-scan:
+    name: Config (Dockerfile + IaC)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: CRITICAL,HIGH
+          # Without this flag the action unsets TRIVY_SEVERITY when format=sarif
+          # and scans for *all* severities, so a LOW finding (e.g. DS-0026
+          # HEALTHCHECK on the devcontainer) would fail this gate. Keep the
+          # filter so exit-code and SARIF only reflect CRITICAL/HIGH.
+          limit-severities-for-sarif: true
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a  # v3
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+  image-scan:
+    name: Image (devcontainer base)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Build devcontainer image
+        run: docker build -t devcontainer:scan ./.devcontainer
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
+        with:
+          image-ref: devcontainer:scan
+          format: sarif
+          output: trivy-image.sarif
+          severity: CRITICAL,HIGH
+          # Informational only: large base images carry CVEs we cannot fix.
+          # SARIF still surfaces them in the Security tab.
+          exit-code: "0"
+          ignore-unfixed: true
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a  # v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image

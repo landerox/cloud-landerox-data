@@ -1,0 +1,225 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cloud-landerox-data"
+version = "0.1.0"
+description = "Public architecture baseline and implementation playbooks for GCP data pipelines (Cloud Functions, Dataflow, BigQuery, Lakehouse patterns)."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = { text = "MIT" }
+authors = [{ name = "Fernando Landero", email = "landerox@gmail.com" }]
+keywords = [
+    "apache-beam",
+    "batch-processing",
+    "bigquery",
+    "cloud-functions",
+    "cloud-storage",
+    "data-engineering",
+    "data-platform",
+    "elt",
+    "etl",
+    "gcp",
+    "google-cloud-dataflow",
+    "google-cloud-platform",
+    "iceberg",
+    "lakehouse",
+    "medallion-architecture",
+    "opentelemetry",
+    "pubsub",
+    "serverless",
+    "slsa",
+    "streaming",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+]
+dependencies = [
+    "apache-beam>=2.72.0",
+    "functions-framework>=3.10.1",
+    "google-cloud-bigquery>=3.41.0",
+    "google-cloud-pubsub>=2.37.0",
+    "google-cloud-secret-manager>=2.27.0",
+    "google-cloud-storage>=3.10.1",
+    "opentelemetry-api>=1.27.0",
+    "opentelemetry-exporter-gcp-trace>=1.9.0",
+    "opentelemetry-sdk>=1.27.0",
+    "pydantic>=2.13.3",
+]
+
+[dependency-groups]
+dev = [
+    "commitizen>=4.13.10",
+    "freezegun>=1.5.5",
+    "hypothesis>=6.152.3",
+    "mutmut>=3.5.0",
+    "pip-audit>=2.10.0",
+    "pre-commit>=4.6.0",
+    "pyright>=1.1.409",
+    "pytest>=9.0.3",
+    "pytest-benchmark>=5.2.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/landerox/cloud-landerox-data"
+Repository = "https://github.com/landerox/cloud-landerox-data"
+Documentation = "https://github.com/landerox/cloud-landerox-data/tree/main/docs"
+Changelog = "https://github.com/landerox/cloud-landerox-data/blob/main/CHANGELOG.md"
+Issues = "https://github.com/landerox/cloud-landerox-data/issues"
+
+[tool.uv]
+package = false
+prerelease = "if-necessary-or-explicit"
+# Force a betterproto version that ships PEP 561 type stubs; older 2.0
+# alphas break Pyright on apache-beam transitively.
+constraint-dependencies = ["betterproto>=2.0.0b6"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["shared"]
+
+[tool.hatch.build.targets.sdist]
+include = ["shared", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_scheme = "semver"
+version = "0.1.0"
+tag_format = "v$version"
+version_files = ["pyproject.toml:^version"]
+update_changelog_on_bump = true
+changelog_file = "CHANGELOG.md"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+    "PTH", # flake8-use-pathlib
+    "ERA", # eradicate
+    "PL",  # pylint
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",    # line too long (formatter handles this)
+    "PLR0913", # too many arguments
+    "PLR2004", # magic value comparison
+]
+
+[tool.pyright]
+# Strict mode is the floor; the suppressions below are deliberate.
+include = ["shared", "tests"]
+# Match pytest's `pythonpath = ["."]`: lets `from shared.common import ...`
+# resolve from the repo root (`shared/` and `tests/` live there directly).
+extraPaths = ["."]
+pythonVersion = "3.13"
+pythonPlatform = "All"
+typeCheckingMode = "strict"
+
+# Third-party libs (apache-beam, google-cloud-*) ship incomplete type
+# stubs, which makes their return types `Unknown` to Pyright. Strict
+# mode then propagates `Unknown` into every call site even when our own
+# code is correctly typed. We mute the four "Unknown propagation" rules
+# globally; the rules that catch *our* mistakes (missing annotations,
+# real type mismatches, optional handling, return-type errors) stay on.
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "none"
+reportUnknownVariableType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+reportUnknownLambdaType = "none"
+reportMissingTypeArgument = "none"
+
+# Tests rely on MagicMock heavily; Pyright cannot type-check dynamic
+# mocks usefully. Hypothesis ships untyped decorators (`@given`,
+# `@settings`) so we silence the related warning for tests only.
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+reportUnusedExpression = "none"
+reportUntypedFunctionDecorator = "none"
+reportAttributeAccessIssue = "none"
+
+[tool.ruff.lint.isort]
+known-first-party = []
+force-sort-within-sections = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "ARG001", # unused function argument (pytest fixtures are common)
+    "ARG002", # unused method argument
+    "PLR2004", # magic value comparison
+]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.coverage.run]
+# Coverage gate is intentionally scoped to shared/** in this baseline;
+# functions/** and dataflow/** are placeholders and tracked separately.
+# Floor is 90% (raised from 80% on 2026-05-01 -- shared/** sits at ~99%).
+source = ["shared"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 90
+exclude_also = [
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "pragma: no cover",
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+[tool.pytest.ini_options]
+# Automatically add the current directory to PYTHONPATH
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    # Benchmarks are not part of the default suite; run with `-m benchmark`.
+    "-m",
+    "not benchmark",
+]
+markers = [
+    "unit: fast tests with no I/O, all externals mocked (default).",
+    "integration: spans multiple components or emulators; nightly-only in CI.",
+    "slow: expensive setup or large fixtures (e.g., Beam end-to-end); nightly-only in CI.",
+    "benchmark: pytest-benchmark micro-benchmarks; opt-in via `-m benchmark`.",
+]
+# Silence noisy warnings from external libraries
+filterwarnings = [
+    "ignore:cannot collect test class 'TestPipeline':pytest.PytestCollectionWarning",
+    "ignore::DeprecationWarning:httplib2.*",
+]
+
+[tool.mutmut]
+paths_to_mutate = "shared/common/"
+tests_dir = "tests/shared/"
+# `--no-header -q -x -m "not benchmark"` keeps each mutant run cheap.
+runner = "uv run pytest --no-header -q -x -m 'not benchmark'"

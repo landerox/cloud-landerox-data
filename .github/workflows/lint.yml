@@ -1,0 +1,212 @@
+# =============================================================================
+# Quality Gates
+# =============================================================================
+#
+# PR-blocking quality pipeline: lint, type-check, test (with coverage),
+# and security audit (pip-audit + license allowlist). Path-filtered to
+# only run when source, tests, tooling, or this workflow change.
+# =============================================================================
+name: CI · Quality Gates
+run-name: >-
+  ${{
+    github.event_name == 'pull_request' && github.event.pull_request.title
+    || github.event_name == 'push' && github.event.head_commit.message
+    || github.event_name
+  }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".pre-commit-config.yaml"
+      - ".config/**"
+      - ".github/scripts/**"
+      - ".github/workflows/lint.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".pre-commit-config.yaml"
+      - ".config/**"
+      - ".github/scripts/**"
+      - ".github/workflows/lint.yml"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install Dependencies
+        run: uv sync --frozen
+
+      - name: Cache pre-commit hooks
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830  # v4
+        with:
+          path: ~/.cache/pre-commit
+          key: precommit-${{ runner.os }}-py3.13-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: |
+            precommit-${{ runner.os }}-py3.13-
+
+      - name: Run pre-commit
+        # no-commit-to-branch is a local-only guard to block direct commits
+        # to main/master. CI runs from main, so skip it here.
+        env:
+          SKIP: no-commit-to-branch
+        run: uv run pre-commit run --all-files --show-diff-on-failure
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install Dependencies
+        run: uv sync --frozen
+
+      - name: Type Check (pyright)
+        run: uv run pyright
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install Dependencies
+        run: uv sync --frozen
+
+      - name: Run Unit Tests with Coverage
+        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe  # v5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+          # Public repos do not require a token for uploads.
+        if: always()
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn
+        if: always()
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install Dependencies
+        run: uv sync --frozen
+
+      - name: Audit Dependencies
+        # CVE-2026-3219 affects pip itself (transitive via pip-audit ->
+        # pip-api -> pip). No fixed version published upstream yet; mirror
+        # the ignore from .pre-commit-config.yaml and remove on bump.
+        run: uv run pip-audit --ignore-vuln=CVE-2026-3219
+
+      - name: License compliance
+        run: |
+          uv run --with pip-licenses pip-licenses \
+            --from=mixed \
+            --format=json \
+            > licenses.json
+          uv run python .github/scripts/check_licenses.py licenses.json
+
+      - name: Upload license report artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: license-report
+          path: licenses.json
+          retention-days: 14

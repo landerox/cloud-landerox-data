@@ -1,0 +1,55 @@
+# =============================================================================
+# Codecov configuration
+# =============================================================================
+#
+# Mirrors the coverage gate defined in pyproject.toml ([tool.coverage.report]
+# fail_under = 80) and adds a per-PR patch gate so newly added code is held
+# to the same bar even if the project total has slack.
+#
+# Scope: this baseline tracks coverage for shared/** only (see
+# pyproject.toml [tool.coverage.run].source). Runtime modules under
+# functions/** and dataflow/pipelines/** are placeholders here and own
+# their own coverage gate in the private runtime repo.
+#
+# Reference: https://docs.codecov.com/docs/codecov-yaml
+# =============================================================================
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 1%
+        base: auto
+        if_ci_failed: error
+        only_pulls: false
+    patch:
+      default:
+        target: 80%
+        threshold: 0%
+        base: auto
+        if_ci_failed: error
+
+comment:
+  layout: "header, diff, flags, components, files, footer"
+  behavior: default
+  require_changes: true
+  require_base: false
+  require_head: true
+
+# Codecov should ignore folders that are intentionally placeholders or
+# generated artifacts in this baseline.
+ignore:
+  - "tests/**"
+  - "dataflow/**"
+  - "functions/**"
+  - "docs/**"
+  - "**/__init__.py"
+  - "**/conftest.py"

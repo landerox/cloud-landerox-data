@@ -1,0 +1,132 @@
+# =============================================================================
+# Pre-commit Configuration
+# =============================================================================
+#
+# This file configures pre-commit hooks for code quality and security checks.
+#
+# Setup:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Manual run:
+#   pre-commit run --all-files
+#
+# Update hooks:
+#   pre-commit autoupdate
+#
+# =============================================================================
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+
+repos:
+  # ---------------------------------------------------------------------------
+  # General Hooks (Managed by pre-commit)
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+        args: [--unsafe]
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch, main, --branch, master]
+
+  # ---------------------------------------------------------------------------
+  # Local Hooks (Uses uv-managed tools from pyproject.toml)
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        require_serial: true
+      - id: pyright
+        name: pyright (type checker, strict)
+        entry: uv run pyright
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: pip-audit
+        name: pip-audit
+        # CVE-2026-3219 affects `pip` 26.0.1 (transitive via pip-audit ->
+        # pip-api -> pip). No fixed version published upstream yet;
+        # re-evaluate on every Dependabot bump and remove the ignore as
+        # soon as a patched pip is released.
+        entry: uv run pip-audit --ignore-vuln=CVE-2026-3219
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+  # ---------------------------------------------------------------------------
+  # CI/CD & Security Hooks
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        args: [--config, .config/gitleaks.toml]
+
+  # ---------------------------------------------------------------------------
+  # Dockerfile, Shell, and YAML Linters
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/AleksaC/hadolint-py
+    rev: v2.14.0
+    hooks:
+      - id: hadolint
+        # DL3008: pinning apt versions is brittle for cloud SDK packages.
+        # DL3015: --no-install-recommends is already used everywhere it can be.
+        args: [--ignore, DL3008, --ignore, DL3015]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [--strict, -c, .config/yamllint.yaml]
+
+  # ---------------------------------------------------------------------------
+  # Markdown Hooks
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.48.0
+    hooks:
+      - id: markdownlint
+        args: [--fix, --config, .config/markdownlint.yaml]
+
+  # ---------------------------------------------------------------------------
+  # Commit Message Hooks
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.13.10
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]

@@ -1,0 +1,38 @@
+# =============================================================================
+# Lychee link checker configuration
+# =============================================================================
+#
+# Reference: https://lychee.cli.rs/usage/configuration/
+#
+# Replaces the previous .lycheeignore file at the repo root. Using
+# .config/lychee.toml lets us keep all repo-level tool configs in one
+# place and document each rejection with a comment.
+# =============================================================================
+
+# Caching defaults (also passed via the action args; kept here so local
+# `lychee --config .config/lychee.toml` runs match CI behaviour).
+cache = true
+max_cache_age = "7d"
+no_progress = true
+include_fragments = true
+
+# Network safety: keep ignored mailtos, loopback addresses, and RFC1918 ranges.
+include_mail = false
+exclude_loopback = true
+exclude_private = true
+
+# URL-pattern excludes. Each entry is a regex; one regex per item, with
+# a comment documenting why the URL gets rejected.
+exclude = [
+    # Shields.io and other dynamic badge endpoints throttle CI requests.
+    "^https?://img\\.shields\\.io/",
+    "^https?://shields\\.io/",
+    # Codecov badge endpoint is rate-limited from CI runners.
+    "^https?://codecov\\.io/gh/.+/branch/.+/graph/badge\\.svg",
+    # GitHub Actions live badge endpoints occasionally 503 on scheduled runs.
+    "^https?://github\\.com/.+/actions/workflows/.+/badge\\.svg",
+    # LinkedIn returns 999 to non-browser User-Agents.
+    "^https?://(www\\.)?linkedin\\.com/",
+    # Localhost and emulator URLs that appear in docs/examples.
+    "^https?://(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)(:[0-9]+)?",
+]

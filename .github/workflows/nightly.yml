@@ -1,0 +1,146 @@
+# =============================================================================
+# Nightly tests (integration + slow) + mutation testing
+# =============================================================================
+#
+# Runs the test categories that are excluded from PR CI by their pytest
+# markers. The tier exists today even when no integration/slow tests are
+# defined so the gate is wired before the first such test lands -- exit
+# code 5 ("no tests collected") is treated as success on purpose.
+#
+# Aligned with docs/guides/testing.md §1: integration and slow tests are
+# nightly-only.
+# =============================================================================
+name: Maintenance · Nightly
+run-name: >-
+  ${{
+    github.event_name == 'schedule' && 'test(nightly): integration + slow + mutmut'
+    || github.event_name
+  }}
+
+on:
+  schedule:
+    # Daily 03:00 UTC. Off-peak from CodeQL/Scorecard/link-check windows.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integration-and-slow:
+    name: Integration + Slow
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run integration + slow tests
+        run: |
+          set +e
+          uv run pytest -m "integration or slow" --tb=short -ra
+          rc=$?
+          set -e
+          # Pytest exit code 5 means "no tests collected"; treat as success
+          # so the workflow can ship before the first integration test exists.
+          if [ "$rc" -eq 5 ]; then
+            echo "::notice title=Nightly Tests::No integration or slow tests defined yet."
+            exit 0
+          fi
+          exit "$rc"
+
+      - name: Upload pytest artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: nightly-pytest-output
+          path: |
+            .pytest_cache/
+            coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  mutation:
+    name: Mutation testing (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    # Informational: failures here do not block anything. The score is
+    # surfaced via the workflow summary.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run mutmut
+        run: |
+          set +e
+          uv run mutmut run
+          rc=$?
+          uv run mutmut results | tee mutmut-results.txt
+          # Exit codes: 0 all killed, 1 some survived, 2 setup error.
+          # Surface 0/1 as success, 2 (or higher) as failure.
+          if [ "$rc" -ge 2 ]; then
+            exit "$rc"
+          fi
+
+      - name: Append summary
+        if: always()
+        run: |
+          {
+            echo "## Mutation testing"
+            echo ""
+            echo '```'
+            head -200 mutmut-results.txt 2>/dev/null || echo "no results"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload mutmut artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: mutmut-results
+          path: |
+            mutmut-results.txt
+            mutants/
+          if-no-files-found: ignore
+          retention-days: 14

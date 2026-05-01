@@ -1,0 +1,162 @@
+# =============================================================================
+# Release workflow
+# =============================================================================
+#
+# Manual-only release pipeline:
+# 1. Commitizen bumps the version in pyproject.toml + CHANGELOG.md.
+# 2. The commit and tag are pushed back to main.
+# 3. A CycloneDX SBOM is produced from the locked environment.
+# 4. A GitHub Release is created with the changelog increment and the SBOM.
+#
+# Trigger is workflow_dispatch on purpose: releases here are deliberate
+# events, not a side effect of merging. A `dry_run` mode lets a maintainer
+# preview the bump and changelog without creating any tag.
+#
+# Pre-conditions:
+# - Conventional Commits style (enforced by the commit-msg pre-commit hook).
+# - GITHUB_TOKEN with `contents: write` (granted at the job level).
+# - Branch protection on `main`: this workflow pushes a commit + tag back,
+#   so the bot identity must be allowed to bypass required PRs (or use a
+#   PAT). See docs/cicd.md "Branch protection".
+# - This is the only workflow where `persist-credentials` defaults to true,
+#   because the bump step needs to `git push origin HEAD --follow-tags`.
+# =============================================================================
+name: CD · Release
+run-name: >-
+  ${{ inputs.increment }}${{ inputs.dry_run == true && ' (dry-run)' || '' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: "Version increment (auto = inferred from commits)"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - PATCH
+          - MINOR
+          - MAJOR
+      dry_run:
+        description: "Dry run (no tag, no push, no release)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Bump and release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      # Required for SLSA provenance attestation via sigstore.
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout (full history for commitizen)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+          # persist-credentials kept at default (true) because the bump
+          # step needs the GITHUB_TOKEN in .git/config to push back.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081  # v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.13.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Bump version with commitizen
+        id: bump
+        run: |
+          set -e
+          args=(--yes --changelog)
+          if [ "${{ inputs.increment }}" != "auto" ]; then
+            args+=(--increment "${{ inputs.increment }}")
+          fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            args+=(--dry-run)
+            echo "is_dry_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_dry_run=false" >> "$GITHUB_OUTPUT"
+          fi
+          uv run cz bump "${args[@]}"
+          new_version=$(uv run cz version --project)
+          echo "new_version=$new_version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$new_version" >> "$GITHUB_OUTPUT"
+
+      - name: Extract changelog increment
+        if: steps.bump.outputs.is_dry_run != 'true'
+        run: |
+          set -e
+          # Grab the first '## ...' section of the changelog (the bump just
+          # written it on top) and write it as the release body.
+          awk '
+            /^## / {
+              if (found) exit
+              found = 1
+            }
+            found
+          ' CHANGELOG.md > release-notes.md
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+
+      - name: Generate CycloneDX SBOM
+        if: steps.bump.outputs.is_dry_run != 'true'
+        run: |
+          set -e
+          uv run --with cyclonedx-bom python -m cyclonedx_py environment \
+            --output-format JSON \
+            --output-file sbom.cdx.json
+          ls -lh sbom.cdx.json
+
+      - name: Generate SLSA build provenance attestation
+        if: steps.bump.outputs.is_dry_run != 'true'
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45  # v2
+        with:
+          # Attest both the source-derived release notes and the SBOM so
+          # consumers can verify provenance with `gh attestation verify`.
+          subject-path: |
+            sbom.cdx.json
+            release-notes.md
+
+      - name: Push commit and tag
+        if: steps.bump.outputs.is_dry_run != 'true'
+        run: git push origin HEAD --follow-tags
+
+      - name: Create GitHub Release
+        if: steps.bump.outputs.is_dry_run != 'true'
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          name: ${{ steps.bump.outputs.tag }}
+          body_path: release-notes.md
+          files: |
+            sbom.cdx.json
+          draft: false
+          prerelease: false
+          generate_release_notes: false

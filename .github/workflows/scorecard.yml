@@ -1,0 +1,73 @@
+# =============================================================================
+# OpenSSF Scorecard
+# =============================================================================
+#
+# Runs the OpenSSF Scorecard checks on a weekly schedule and on changes to the
+# default branch. Results are uploaded to the GitHub Security tab as SARIF and
+# (optionally) published to the public OpenSSF Scorecard dashboard so the
+# repository's posture is visible to consumers.
+#
+# Required for SARIF upload: Code Scanning enabled on the repo.
+# Required for dashboard publication: the repo must be public (it is).
+#
+# Reference: https://github.com/ossf/scorecard-action
+# =============================================================================
+name: Security · Scorecard
+run-name: >-
+  ${{
+    github.event_name == 'schedule' && 'security(scorecard): weekly supply-chain audit'
+    || github.event_name == 'push' && github.event.head_commit.message
+    || github.event_name
+  }}
+
+on:
+  branch_protection_rule:
+  schedule:
+    # Mondays 07:00 UTC. One hour after the CodeQL window so the two SAST jobs
+    # do not contend for runner capacity.
+    - cron: "0 7 * * 1"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      # Needed for SARIF upload to the Security tab.
+      security-events: write
+      # Needed to publish results and get a badge.
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          persist-credentials: false
+
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # Public results: pushed to the OpenSSF Scorecard API and the
+          # https://securityscorecards.dev dashboard.
+          publish_results: true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 7
+
+      - name: Upload SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@ce64ddcb0d8d890d2df4a9d1c04ff297367dea2a  # v3
+        with:
+          sarif_file: results.sarif

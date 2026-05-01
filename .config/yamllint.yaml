@@ -1,0 +1,47 @@
+# =============================================================================
+# yamllint configuration
+# =============================================================================
+#
+# Tuned for this repository's YAML mix:
+# - GitHub Actions workflows (where 'on:' triggers a default truthy warning)
+# - Dependabot, pre-commit, markdownlint, devcontainer configs
+# - Issue templates
+#
+# Reference: https://yamllint.readthedocs.io/en/stable/configuration.html
+# =============================================================================
+extends: default
+
+ignore: |
+  .venv/
+  .ruff_cache/
+  .mypy_cache/
+  .pytest_cache/
+  .dev-suite-backups/
+  uv.lock
+  node_modules/
+
+rules:
+  # 'on:' in GitHub Actions workflows triggers truthy by default; relax it
+  # without losing the rule for actual values (true/false in code).
+  truthy:
+    check-keys: false
+    level: warning
+
+  # Workflows and configs occasionally include long URLs or jq filters.
+  line-length:
+    max: 120
+    level: warning
+
+  # Pre-commit, dependabot, and most modern YAML configs omit `---`.
+  document-start: disable
+
+  # Block-comment indentation in dependabot/pre-commit configs is intentional.
+  comments-indentation: disable
+
+  comments:
+    min-spaces-from-content: 1
+
+  # Issue templates use empty values in dropdown defaults.
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: false
